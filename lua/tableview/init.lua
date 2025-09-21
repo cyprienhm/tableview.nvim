@@ -149,7 +149,7 @@ local function format_table_lines(data)
 end
 
 function M.display_table(data, filename)
-	local buf = vim.api.nvim_create_buf(false, true)
+	local buf = vim.api.nvim_create_buf(true, true)
 	vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
 	vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
 	vim.api.nvim_buf_set_name(buf, "TableView: " .. vim.fn.fnamemodify(filename, ":t"))
