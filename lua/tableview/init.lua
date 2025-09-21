@@ -17,7 +17,21 @@ end
 
 local function read_parquet(filename)
 	local python_code = string.format(
-		"import pyarrow.parquet as pq; print(pq.read_table('%s').to_pandas().to_csv(index=False))",
+		[[
+import pyarrow.parquet as pq
+table = pq.read_table('%s')
+
+print(f"Shape: ({table.num_rows}, {table.num_columns})")
+print("Columns:")
+for i, col_name in enumerate(table.column_names):
+    col_type = table.schema.field(i).type
+    print(f"  {col_name}: {col_type}")
+print()
+
+# Show only first 100 rows
+display_table = table.slice(0, min(100, table.num_rows))
+print(display_table.to_pandas().to_csv(index=False))
+]],
 		filename
 	)
 
@@ -30,7 +44,7 @@ local function read_parquet(filename)
 		return result.stdout, nil
 	end
 
-	local fallback_result = vim.system({ "parquet-tools", "cat", filename }, {
+	local fallback_result = vim.system({ "parquet-tools", "head", "-n", "100", filename }, {
 		stdout_buffered = true,
 		stderr_buffered = true,
 	}):wait()
