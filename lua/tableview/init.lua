@@ -44,16 +44,7 @@ print(display_table.to_pandas().to_csv(index=False))
 		return result.stdout, nil
 	end
 
-	local fallback_result = vim.system({ "parquet-tools", "head", "-n", "100", filename }, {
-		stdout_buffered = true,
-		stderr_buffered = true,
-	}):wait()
-
-	if fallback_result.code == 0 then
-		return fallback_result.stdout, nil
-	end
-
-	return nil, "Python/pyarrow not available and parquet-tools not found"
+	return nil, "Python or pyarrow not available."
 end
 
 local function read_csv(filename, delimiter)
