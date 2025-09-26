@@ -15,6 +15,19 @@ local function detect_format(filename)
 	return "unknown"
 end
 
+local function execute_python_formatting(python_code)
+	local result = vim.system({ "python3", "-c", python_code }, {
+		stdout_buffered = true,
+		stderr_buffered = true,
+	}):wait()
+
+	if result.code == 0 then
+		return result.stdout, nil
+	end
+
+	return nil, "Python dependencies not available."
+end
+
 local function read_parquet(filename)
 	local python_code = string.format(
 		[[
@@ -28,60 +41,54 @@ for i, col_name in enumerate(table.column_names):
     print(f"  {col_name}: {col_type}")
 print()
 
-# Show only first 100 rows
 display_table = table.slice(0, min(100, table.num_rows))
-print(display_table.to_pandas().to_csv(index=False))
+df = display_table.to_pandas()
+
+maxpercol = df.map(lambda x: len(str(x)) if x is not None else 3).max().to_dict()
+
+for i, row in df.iterrows():
+    for col in df.columns:
+        width = maxpercol[col]
+        elt = row[col]
+        if elt is None or str(elt) == 'nan':
+            elt = "nan"
+        print(f"{str(elt): ^{width}}", end=" ")
+    print()
 ]],
 		filename
 	)
 
-	local result = vim.system({ "python3", "-c", python_code }, {
-		stdout_buffered = true,
-		stderr_buffered = true,
-	}):wait()
-
-	if result.code == 0 then
-		return result.stdout, nil
-	end
-
-	return nil, "Python or pyarrow not available."
+	return execute_python_formatting(python_code)
 end
 
 local function read_csv(filename, delimiter)
-	delimiter = delimiter or ","
-	local file = io.open(filename, "r")
-	if not file then
-		return nil, "Could not open file"
-	end
+	local python_code = string.format(
+		[[
+import pandas as pd
+df = pd.read_csv('%s', delimiter='%s', nrows=100)
 
-	local content = file:read("*a")
-	file:close()
-	return content, nil
-end
+print(f"Shape: ({len(df)}, {len(df.columns)})")
+print("Columns:")
+for col in df.columns:
+    print(f"  {col}: {df[col].dtype}")
+print()
 
-local function parse_csv_to_table(content, delimiter)
-	delimiter = delimiter or ","
-	local lines = {}
-	for line in content:gmatch("[^\r\n]+") do
-		local fields = {}
-		local field = ""
-		local in_quotes = false
+maxpercol = df.map(lambda x: len(str(x)) if x is not None else 3).max().to_dict()
 
-		for i = 1, #line do
-			local char = line:sub(i, i)
-			if char == '"' then
-				in_quotes = not in_quotes
-			elseif char == delimiter and not in_quotes then
-				table.insert(fields, field)
-				field = ""
-			else
-				field = field .. char
-			end
-		end
-		table.insert(fields, field)
-		table.insert(lines, fields)
-	end
-	return lines
+for i, row in df.iterrows():
+    for col in df.columns:
+        width = maxpercol[col]
+        elt = row[col]
+        if pd.isna(elt):
+            elt = "nan"
+        print(f"{str(elt): ^{width}}", end=" ")
+    print()
+]],
+		filename,
+		delimiter
+	)
+
+	return execute_python_formatting(python_code)
 end
 
 function M.open(filename)
@@ -103,63 +110,24 @@ function M.open(filename)
 		vim.notify("TableView: Unsupported file format", vim.log.levels.ERROR)
 		return
 	end
-
 	if err then
 		vim.notify("TableView: " .. err, vim.log.levels.ERROR)
 		return
 	end
-
-	local data = parse_csv_to_table(content)
-	if #data == 0 then
-		vim.notify("TableView: No data found", vim.log.levels.ERROR)
-		return
-	end
-
-	M.display_table(data, filename)
+	M.display_formatted_content(content, filename)
 end
 
-local function calculate_column_widths(data)
-	local widths = {}
-	for _, row in ipairs(data) do
-		for j, cell in ipairs(row) do
-			local len = string.len(tostring(cell))
-			widths[j] = math.max(widths[j] or 0, len)
-		end
-	end
-	return widths
-end
-
-local function format_table_lines(data)
-	local widths = calculate_column_widths(data)
-	local lines = {}
-
-	for i, row in ipairs(data) do
-		local formatted_cells = {}
-		for j, cell in ipairs(row) do
-			local padded = string.format("%-" .. widths[j] .. "s", tostring(cell))
-			table.insert(formatted_cells, padded)
-		end
-		table.insert(lines, table.concat(formatted_cells, " │ "))
-
-		if i == 1 then
-			local separator_cells = {}
-			for j = 1, #row do
-				table.insert(separator_cells, string.rep("─", widths[j]))
-			end
-			table.insert(lines, table.concat(separator_cells, "─┼─"))
-		end
-	end
-
-	return lines
-end
-
-function M.display_table(data, filename)
+function M.display_formatted_content(content, filename)
 	local buf = vim.api.nvim_create_buf(true, true)
 	vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
 	vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
 	vim.api.nvim_buf_set_name(buf, "TableView: " .. vim.fn.fnamemodify(filename, ":t"))
 
-	local lines = format_table_lines(data)
+	local lines = {}
+	for line in content:gmatch("[^\r\n]+") do
+		table.insert(lines, line)
+	end
+
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 	vim.api.nvim_set_option_value("modifiable", false, { buf = buf })
 
@@ -168,10 +136,6 @@ function M.display_table(data, filename)
 	local keymaps = {
 		{ "n", "q", "<cmd>bdelete<cr>" },
 		{ "n", "<C-c>", "<cmd>bdelete<cr>" },
-		{ "n", "j", "j" },
-		{ "n", "k", "k" },
-		{ "n", "h", "h" },
-		{ "n", "l", "l" },
 	}
 
 	for _, keymap in ipairs(keymaps) do
