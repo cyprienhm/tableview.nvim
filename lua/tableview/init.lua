@@ -152,7 +152,6 @@ function M.display_formatted_content(content, filename)
 
 	local keymaps = {
 		{ "n", "q", "<cmd>bdelete<cr>" },
-		{ "n", "<C-c>", "<cmd>bdelete<cr>" },
 	}
 
 	for _, keymap in ipairs(keymaps) do
