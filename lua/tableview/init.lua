@@ -25,7 +25,7 @@ local function execute_python_formatting(python_code)
 		return result.stdout, nil
 	end
 
-	return nil, "Python dependencies not available."
+	return nil, "Python error when reading file"
 end
 
 local function read_parquet(filename)
@@ -45,15 +45,24 @@ display_table = table.slice(0, min(100, table.num_rows))
 df = display_table.to_pandas()
 
 maxpercol = df.map(lambda x: len(str(x)) if x is not None else 3).max().to_dict()
+maxpercol = {col_name: max(len(col_name), width) for col_name, width in maxpercol.items()}
+
+print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
+print("|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|")
+print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
 
 for i, row in df.iterrows():
+    print("|", end="")
     for col in df.columns:
         width = maxpercol[col]
         elt = row[col]
         if elt is None or str(elt) == 'nan':
             elt = "nan"
-        print(f"{str(elt): ^{width}}", end=" ")
+        print(f" {str(elt): ^{width}} |", end="")
     print()
+
+
+print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
 ]],
 		filename
 	)
@@ -74,15 +83,24 @@ for col in df.columns:
 print()
 
 maxpercol = df.map(lambda x: len(str(x)) if x is not None else 3).max().to_dict()
+maxpercol = {col_name: max(len(col_name), width) for col_name, width in maxpercol.items()}
+
+print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
+print("|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|")
+print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
+
 
 for i, row in df.iterrows():
+    print("|", end="")
     for col in df.columns:
         width = maxpercol[col]
         elt = row[col]
         if pd.isna(elt):
             elt = "nan"
-        print(f"{str(elt): ^{width}}", end=" ")
+        print(f" {str(elt): ^{width}} |", end="")
     print()
+
+print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
 ]],
 		filename,
 		delimiter
