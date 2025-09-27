@@ -25,7 +25,7 @@ local function execute_python_formatting(python_code)
 		return result.stdout, nil
 	end
 
-	return nil, "Python error when reading file"
+	return result.stderr, "Python error when reading file"
 end
 
 local function read_parquet(filename)
@@ -130,7 +130,6 @@ function M.open(filename)
 	end
 	if err then
 		vim.notify("TableView: " .. err, vim.log.levels.ERROR)
-		return
 	end
 	M.display_formatted_content(content, filename)
 end
