@@ -71,10 +71,16 @@ print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
 end
 
 local function read_csv(filename, delimiter)
+	if not delimiter then
+		delimiter = "None"
+	else
+		delimiter = '"' .. delimiter .. '"'
+	end
+
 	local python_code = string.format(
 		[[
 import pandas as pd
-df = pd.read_csv('%s', delimiter='%s', nrows=100)
+df = pd.read_csv('%s', sep=%s, nrows=100)
 
 print(f"Shape: ({len(df)}, {len(df.columns)})")
 print("Columns:")
@@ -121,7 +127,7 @@ function M.open(filename)
 	if format == "parquet" then
 		content, err = read_parquet(filename)
 	elseif format == "csv" then
-		content, err = read_csv(filename, ",")
+		content, err = read_csv(filename)
 	elseif format == "tsv" then
 		content, err = read_csv(filename, "\t")
 	else
