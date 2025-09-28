@@ -135,10 +135,19 @@ function M.open(filename)
 end
 
 function M.display_formatted_content(content, filename)
-	local buf = vim.api.nvim_create_buf(true, true)
-	vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
-	vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
-	vim.api.nvim_buf_set_name(buf, "TableView: " .. vim.fn.fnamemodify(filename, ":t"))
+	local buf_name = "TableView: " .. vim.fn.fnamemodify(filename, ":t")
+	local existing_buf = vim.fn.bufnr(buf_name)
+
+	local buf
+	if existing_buf ~= -1 then
+		buf = existing_buf
+		vim.api.nvim_set_option_value("modifiable", true, { buf = buf })
+	else
+		buf = vim.api.nvim_create_buf(true, true)
+		vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
+		vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
+		vim.api.nvim_buf_set_name(buf, buf_name)
+	end
 
 	local lines = {}
 	for line in content:gmatch("[^\r\n]+") do
