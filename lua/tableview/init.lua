@@ -1,4 +1,5 @@
 local M = {}
+local highlights = require("tableview.highlights")
 
 local function detect_format(filename)
 	local ext = filename:match("%.([^%.]+)$")
@@ -32,14 +33,19 @@ local function read_parquet(filename)
 	local python_code = string.format(
 		[[
 import pyarrow.parquet as pq
+import json
+
 table = pq.read_table('%s')
 
-print(f"Shape: ({table.num_rows}, {table.num_columns})")
-print("Columns:")
+lines = []
+highlights = []
+
+lines.append(f"Shape: ({table.num_rows}, {table.num_columns})")
+lines.append("Columns:")
 for i, col_name in enumerate(table.column_names):
     col_type = table.schema.field(i).type
-    print(f"  {col_name}: {col_type}")
-print()
+    lines.append(f"  {col_name}: {col_type}")
+lines.append("")
 
 display_table = table.slice(0, min(100, table.num_rows))
 df = display_table.to_pandas()
@@ -47,22 +53,33 @@ df = display_table.to_pandas()
 maxpercol = df.map(lambda x: len(str(x)) if x is not None else 3).max().to_dict()
 maxpercol = {col_name: max(len(col_name), width) for col_name, width in maxpercol.items()}
 
-print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
-print("|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|")
-print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
+border_line = "+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+"
+header_line = "|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|"
+
+lines.append(border_line)
+highlights.append({"line": len(lines) - 1, "type": "border"})
+
+lines.append(header_line)
+highlights.append({"line": len(lines) - 1, "type": "header"})
+
+lines.append(border_line)
+highlights.append({"line": len(lines) - 1, "type": "border"})
 
 for i, row in df.iterrows():
-    print("|", end="")
+    row_line = "|"
     for col in df.columns:
         width = maxpercol[col]
         elt = row[col]
         if elt is None or str(elt) == 'nan':
             elt = "nan"
-        print(f" {str(elt): ^{width}} |", end="")
-    print()
+        row_line += f" {str(elt): ^{width}} |"
+    lines.append(row_line)
 
+lines.append(border_line)
+highlights.append({"line": len(lines) - 1, "type": "border"})
 
-print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
+result = {"lines": lines, "highlights": highlights}
+print(json.dumps(result))
 ]],
 		filename
 	)
@@ -80,33 +97,49 @@ local function read_csv(filename, delimiter)
 	local python_code = string.format(
 		[[
 import pandas as pd
+import json
+
 df = pd.read_csv('%s', sep=%s, nrows=100)
 
-print(f"Shape: ({len(df)}, {len(df.columns)})")
-print("Columns:")
+lines = []
+highlights = []
+
+lines.append(f"Shape: ({len(df)}, {len(df.columns)})")
+lines.append("Columns:")
 for col in df.columns:
-    print(f"  {col}: {df[col].dtype}")
-print()
+    lines.append(f"  {col}: {df[col].dtype}")
+lines.append("")
 
 maxpercol = df.map(lambda x: len(str(x)) if x is not None else 3).max().to_dict()
 maxpercol = {col_name: max(len(col_name), width) for col_name, width in maxpercol.items()}
 
-print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
-print("|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|")
-print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
+border_line = "+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+"
+header_line = "|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|"
 
+lines.append(border_line)
+highlights.append({"line": len(lines) - 1, "type": "border"})
+
+lines.append(header_line)
+highlights.append({"line": len(lines) - 1, "type": "header"})
+
+lines.append(border_line)
+highlights.append({"line": len(lines) - 1, "type": "border"})
 
 for i, row in df.iterrows():
-    print("|", end="")
+    row_line = "|"
     for col in df.columns:
         width = maxpercol[col]
         elt = row[col]
         if pd.isna(elt):
             elt = "nan"
-        print(f" {str(elt): ^{width}} |", end="")
-    print()
+        row_line += f" {str(elt): ^{width}} |"
+    lines.append(row_line)
 
-print("+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+")
+lines.append(border_line)
+highlights.append({"line": len(lines) - 1, "type": "border"})
+
+result = {"lines": lines, "highlights": highlights}
+print(json.dumps(result))
 ]],
 		filename,
 		delimiter
@@ -155,13 +188,13 @@ function M.display_formatted_content(content, filename)
 		vim.api.nvim_buf_set_name(buf, buf_name)
 	end
 
-	local lines = {}
-	for line in content:gmatch("[^\r\n]+") do
-		table.insert(lines, line)
-	end
+	local data = vim.json.decode(content)
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, data.lines)
+	highlights.setup()
+	highlights.apply_structured_highlights(buf, data.highlights)
 
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 	vim.api.nvim_set_option_value("modifiable", false, { buf = buf })
+	vim.api.nvim_set_option_value("filetype", "tableview", { buf = buf })
 
 	vim.api.nvim_win_set_buf(0, buf)
 
