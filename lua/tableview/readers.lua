@@ -41,26 +41,57 @@ border_line = "+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]
 header_line = "|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|"
 
 lines.append(border_line)
-highlights.append({"line": len(lines) - 1, "type": "border"})
-
 lines.append(header_line)
-highlights.append({"line": len(lines) - 1, "type": "header"})
+
+col_pos = 1
+for col_name, width in maxpercol.items():
+    highlights.append({
+        "line": len(lines) - 1,
+        "col_start": col_pos,
+        "col_end": col_pos + width + 2,
+        "type": "header"
+    })
+    col_pos += width + 3
 
 lines.append(border_line)
-highlights.append({"line": len(lines) - 1, "type": "border"})
 
 for i, row in df.iterrows():
     row_line = "|"
+    line_highlights = []
+    col_pos = 1
+
     for col in df.columns:
         width = maxpercol[col]
         elt = row[col]
-        if elt is None or str(elt) == 'nan':
+        is_null = elt is None or str(elt) == 'nan'
+
+        if is_null:
             elt = "nan"
-        row_line += f" {str(elt): ^{width}} |"
+            cell_type = "null"
+        else:
+            col_dtype = str(display_table.schema.field(col).type)
+            if any(t in col_dtype.lower() for t in ['int', 'float', 'double', 'decimal']):
+                cell_type = "number"
+            elif 'bool' in col_dtype.lower():
+                cell_type = "boolean"
+            else:
+                cell_type = "string"
+
+        cell_str = f" {str(elt): ^{width}} "
+        row_line += cell_str + "|"
+
+        line_highlights.append({
+            "line": len(lines),
+            "col_start": col_pos,
+            "col_end": col_pos + width + 2,
+            "type": cell_type
+        })
+        col_pos += width + 3
+
     lines.append(row_line)
+    highlights.extend(line_highlights)
 
 lines.append(border_line)
-highlights.append({"line": len(lines) - 1, "type": "border"})
 
 result = {"lines": lines, "highlights": highlights}
 print(json.dumps(result))
@@ -101,26 +132,57 @@ border_line = "+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]
 header_line = "|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|"
 
 lines.append(border_line)
-highlights.append({"line": len(lines) - 1, "type": "border"})
-
 lines.append(header_line)
-highlights.append({"line": len(lines) - 1, "type": "header"})
+
+col_pos = 1
+for col_name, width in maxpercol.items():
+    highlights.append({
+        "line": len(lines) - 1,
+        "col_start": col_pos,
+        "col_end": col_pos + width + 2,
+        "type": "header"
+    })
+    col_pos += width + 3
 
 lines.append(border_line)
-highlights.append({"line": len(lines) - 1, "type": "border"})
 
 for i, row in df.iterrows():
     row_line = "|"
+    line_highlights = []
+    col_pos = 1
+
     for col in df.columns:
         width = maxpercol[col]
         elt = row[col]
-        if pd.isna(elt):
+        is_null = pd.isna(elt)
+
+        if is_null:
             elt = "nan"
-        row_line += f" {str(elt): ^{width}} |"
+            cell_type = "null"
+        else:
+            dtype = str(df[col].dtype)
+            if dtype.startswith(('int', 'float', 'uint', 'complex')):
+                cell_type = "number"
+            elif dtype == 'bool':
+                cell_type = "boolean"
+            else:
+                cell_type = "string"
+
+        cell_str = f" {str(elt): ^{width}} "
+        row_line += cell_str + "|"
+
+        line_highlights.append({
+            "line": len(lines),
+            "col_start": col_pos,
+            "col_end": col_pos + width + 2,
+            "type": cell_type
+        })
+        col_pos += width + 3
+
     lines.append(row_line)
+    highlights.extend(line_highlights)
 
 lines.append(border_line)
-highlights.append({"line": len(lines) - 1, "type": "border"})
 
 result = {"lines": lines, "highlights": highlights}
 print(json.dumps(result))
