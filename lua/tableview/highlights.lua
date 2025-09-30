@@ -6,6 +6,12 @@ local highlights = {
 	TableViewData = { default = true, link = "Normal" },
 }
 
+local type_to_hl = {
+	header = "TableViewHeader",
+	border = "TableViewBorder",
+	data = "TableViewData",
+}
+
 function M.setup()
 	for k, v in pairs(highlights) do
 		vim.api.nvim_set_hl(0, k, v)
@@ -18,7 +24,7 @@ function M.apply_structured_highlights(buf, highlight_data)
 
 	for _, hl in ipairs(highlight_data) do
 		local line_idx = hl.line
-		local hl_group = hl.type == "header" and "TableViewHeader" or "TableViewBorder"
+		local hl_group = type_to_hl[hl.type]
 
 		if lines[line_idx + 1] then
 			vim.api.nvim_buf_set_extmark(buf, ns, line_idx, 0, {
