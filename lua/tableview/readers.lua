@@ -18,6 +18,9 @@ function M.read_parquet(filename)
 		[[
 import pyarrow.parquet as pq
 import json
+import numpy as np
+
+np.set_printoptions(precision=3, linewidth=75, threshold=5, edgeitems=2)
 
 table = pq.read_table('%s')
 
