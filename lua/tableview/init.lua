@@ -8,6 +8,8 @@ local function detect_format(filename)
 		ext = ext:lower()
 		if ext == "parquet" then
 			return "parquet"
+		elseif ext == "pkl" then
+			return "pkl"
 		elseif ext == "csv" then
 			return "csv"
 		elseif ext == "tsv" then
@@ -28,6 +30,8 @@ function M.open(filename)
 
 	if format == "parquet" then
 		content, err = readers.read_parquet(filename)
+	elseif format == "pkl" then
+		content, err = readers.read_pandas_pickle(filename)
 	elseif format == "csv" then
 		content, err = readers.read_csv(filename)
 	elseif format == "tsv" then

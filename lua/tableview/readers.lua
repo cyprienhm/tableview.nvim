@@ -197,4 +197,92 @@ print(json.dumps(result))
 	return execute_python_formatting(python_code)
 end
 
+function M.read_pandas_pickle(filename)
+	local python_code = string.format(
+		[[
+import pandas as pd
+import json
+import numpy as np
+
+np.set_printoptions(precision=3, linewidth=75, threshold=5, edgeitems=2)
+
+df = pd.read_pickle('%s').iloc[:100]
+
+lines = []
+highlights = []
+
+lines.append(f"Shape: ({len(df)}, {len(df.columns)})")
+lines.append("Columns:")
+for col in df.columns:
+    lines.append(f"  {col}: {df[col].dtype}")
+lines.append("")
+
+maxpercol = df.map(lambda x: len(str(x)) if x is not None else 3).max().to_dict()
+maxpercol = {col_name: max(len(col_name), width) for col_name, width in maxpercol.items()}
+
+border_line = "+" + "+".join(["-" * (width + 2) for width in maxpercol.values()]) + "+"
+header_line = "|" + "|".join([f" {col_name: ^{width}} " for col_name, width in maxpercol.items()]) + "|"
+
+lines.append(border_line)
+lines.append(header_line)
+
+col_pos = 1
+for col_name, width in maxpercol.items():
+    highlights.append({
+        "line": len(lines) - 1,
+        "col_start": col_pos,
+        "col_end": col_pos + width + 2,
+        "type": "header"
+    })
+    col_pos += width + 3
+
+lines.append(border_line)
+
+for i, row in df.iterrows():
+    row_line = "|"
+    line_highlights = []
+    col_pos = 1
+
+    for col in df.columns:
+        width = maxpercol[col]
+        elt = row[col]
+        is_null = elt is None or str(elt) == 'nan'
+
+        if is_null:
+            elt = "nan"
+            cell_type = "null"
+        else:
+            dtype = str(df[col].dtype)
+            if dtype.startswith(('int', 'float', 'uint', 'complex')):
+                cell_type = "number"
+            elif dtype == 'bool':
+                cell_type = "boolean"
+            else:
+                cell_type = "string"
+
+        cell_str = f" {str(elt): ^{width}} "
+        row_line += cell_str + "|"
+
+        line_highlights.append({
+            "line": len(lines),
+            "col_start": col_pos,
+            "col_end": col_pos + width + 2,
+            "type": cell_type
+        })
+        col_pos += width + 3
+
+    lines.append(row_line)
+    highlights.extend(line_highlights)
+
+lines.append(border_line)
+
+result = {"lines": lines, "highlights": highlights}
+print(json.dumps(result))
+]],
+		filename,
+		delimiter
+	)
+
+	return execute_python_formatting(python_code)
+end
 return M
