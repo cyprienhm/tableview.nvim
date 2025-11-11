@@ -2,7 +2,7 @@ local M = {}
 local highlights = require("tableview.highlights")
 
 function M.display_formatted_content(content, filename)
-	local buf_name = "TableView: " .. vim.fn.fnamemodify(filename, ":t")
+	local buf_name = "TableView://" .. filename
 	local existing_buf = vim.fn.bufnr(buf_name)
 
 	local buf
