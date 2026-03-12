@@ -54,6 +54,8 @@ function M.open(filename, buf)
 				local val = record[h]
 				if val == nil or val == vim.NIL then
 					row[i] = "NULL"
+				elseif type(val) == "table" then
+					row[i] = vim.json.encode(val)
 				else
 					row[i] = tostring(val)
 				end
