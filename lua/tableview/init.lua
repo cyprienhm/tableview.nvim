@@ -36,12 +36,15 @@ function M.open(filename, buf)
 			return
 		end
 
-		-- Extract headers from keys of first row
+		-- Extract headers in original column order from raw JSON
 		local headers = {}
-		for key, _ in pairs(data[1]) do
-			table.insert(headers, key)
+		local seen = {}
+		for key in json_text:gmatch('"([^"]+)"%s*:') do
+			if not seen[key] then
+				seen[key] = true
+				table.insert(headers, key)
+			end
 		end
-		table.sort(headers)
 
 		-- Extract rows as arrays in header order
 		local rows = {}
